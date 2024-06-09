@@ -1,0 +1,4 @@
+dearpygui==1.11.1
+dearpygui_ext==0.9.5
+pycryptodome==3.20.0
+pythonnet==3.0.3
