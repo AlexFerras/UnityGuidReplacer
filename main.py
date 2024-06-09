@@ -2,6 +2,7 @@ import os
 from dataclasses import dataclass, asdict
 import os
 import sys
+import threading
 import dearpygui.dearpygui as dpg
 import dearpygui_ext.logger as logger
 from glob import glob
@@ -79,13 +80,13 @@ def collect_news_and_paths_dll(module:str):
     from ReflectLib import ReflectClass
     main = ReflectClass()
 
-    new_path = module.replace(OLD_AP, NEW_AP).removesuffix(".dll")
-    result = [y for x in os.walk(new_path) for y in glob(os.path.join(x[0], '*.cs'))]
+    m_new_path = module.replace(old_path, new_path).removesuffix(".dll")
+    result = [y for x in os.walk(m_new_path) for y in glob(os.path.join(x[0], '*.cs'))]
     for file in result:
         #print(f"working on {file}")
 
         meta = file + ".meta"
-        file_path = file.removeprefix(new_path)
+        file_path = file.removeprefix(m_new_path)
         guid:str
         with open(meta) as f:
             f.readline()
@@ -117,7 +118,7 @@ def collect_old_guids_dll(module:str):
 
     for e in last_module_entries:
         e.old_guid = guid
-        log_info(f"Collected {e.file_path} guid {e.new_guid}" )
+        log_info(f"Collected {module.removeprefix(old_path)}\{e.file_path} guid {e.new_guid}" )
 
 
 def get_meta_guid(file_path:str):
@@ -159,7 +160,7 @@ def collect_news(module:str):
             
             #print(f"{e.file_path}: {e.old_guid} -> {e.new_guid}")
             #print(guid)
-            log_info(f"Collected {e.file_path} guid {e.new_guid}" )
+            log_info(f"Collected {module.removeprefix(old_path)}\{e.file_path} guid {e.new_guid}" )
         except:
             for_remove.append(e)
 
@@ -242,11 +243,10 @@ def work_on_prefabs_dir():
     anims = [y for x in os.walk(path) for y in glob(os.path.join(x[0], '*.anim'))]
     result = prefabs + assets + mats + anims
 
-    for prefab in result:
+    def write_prefab(prefab:str):
         text:str
         old_text:str
-        
-        log_info(f"Progress: {result.index(prefab)} / {len(result) - 1}. File: {prefab.removeprefix(assets_path)}")
+        log_info(f"Progress {result.index(prefab)} / {len(result)} File: {prefab.removeprefix(assets_path)}")
 
         with open(prefab, encoding="utf-8") as f:
             text = f.read()
@@ -261,14 +261,23 @@ def work_on_prefabs_dir():
             new_format = f"fileID: {SINGLE_FILE_ID}, guid :{e.new_guid}"
             text = text.replace(old_format, new_format)
             
-            #print(f"replacing {e.file_path} in {prefab}")
 
         if text == old_text:
-            #print("no old format found")
             pass
 
         with open(prefab, "w", encoding="utf-8") as new:
             new.write(text)
+
+
+    import concurrent.futures
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
+        executor.map(write_prefab, result)
+        executor.shutdown()
+
+
+    
+
     
 def get_modules():
     for d in os.listdir(old_path):
@@ -318,7 +327,11 @@ def run():
     get_modules()
     log_trace(f"Starting collecting modules")
     m:str
-    for m in modules:
+    threads = []
+
+    modules_collected = 0
+
+    def collect_module(m):
         log_trace(f"Collecting module {m}")
         last_module_entries.clear()
         if not is_old_dll(m):
@@ -328,7 +341,21 @@ def run():
             collect_news_and_paths_dll(m)
             collect_old_guids_dll(m)
 
+        global entries
         entries+=last_module_entries
+        nonlocal modules_collected
+        modules_collected+=1
+
+
+
+    for m in modules:
+        t = threading.Thread(target=collect_module, args=[m], daemon=True)
+        t.start()
+
+    import time
+    while modules_collected < len(modules):
+        time.sleep(0.05)
+        
 
     entries_to_json()
 
