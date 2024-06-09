@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass, asdict
 import os
+import sys
 import dearpygui.dearpygui as dpg
 import dearpygui_ext.logger as logger
 from glob import glob
@@ -69,7 +70,7 @@ def collect_news_and_paths_dll(module:str):
 
     import clr
 
-    for path in absolute_file_paths(os.getcwd() + LIB_AP):
+    for path in absolute_file_paths(sys.path[0] + LIB_AP):
         clr.AddReference(path)
 
 
@@ -461,15 +462,15 @@ with dpg.window(label="Example Window", tag="mainwindow"):
 
         with dpg.tab(label="scene", tag="tb_sc"):
             create_dir_input("Scene:", "scenepath")
-            create_dir_input("Result Folder:", "resultpath", dir=True, default_value=os.getcwd() + RES_AP)
+            create_dir_input("Result Folder:", "resultpath", dir=True, default_value=sys.path[0] + RES_AP)
         
         print(dpg.get_item_info("tb_sc"))
 
         with dpg.tab(label="assets", tag="tb_as"):
             create_dir_input("Assets:", "assetspath", dir=True)
     
-    create_dir_input("Old Modules Folder:", "oldpath", dir=True, default_value=os.getcwd() + OLD_AP)
-    create_dir_input("New Modules Folder:", "newpath", dir=True, default_value=os.getcwd() + NEW_AP)
+    create_dir_input("Old Modules Folder:", "oldpath", dir=True, default_value=sys.path[0] + OLD_AP)
+    create_dir_input("New Modules Folder:", "newpath", dir=True, default_value=sys.path[0] + NEW_AP)
         
     dpg.add_button(label="Run", width= 100, height=50, callback=run_callback)
 
